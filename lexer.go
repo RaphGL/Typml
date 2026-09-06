@@ -1,7 +1,6 @@
-package main
+package typml
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 )
@@ -13,6 +12,7 @@ const (
 	TokenTypeColon
 	TokenTypeSemicolon
 	TokenTypeIdent
+	TokenTypeString
 	TokenTypeNumber
 	TokenTypeLeftParen
 	TokenTypeRightParen
@@ -49,6 +49,33 @@ func NewLexer(s string) Lexer {
 	}
 }
 
+func (l *Lexer) lexString() (token Token, ok bool) {
+	l.sr.UnreadRune()
+	r, _, err := l.sr.ReadRune()
+	if err != nil || r != '"' {
+		return
+	}
+
+	var sb strings.Builder
+
+	for {
+		r, _, err := l.sr.ReadRune()
+		if err != nil {
+			return
+		}
+		if r == '"' {
+			break
+		}
+
+		sb.WriteRune(r)
+	}
+
+	ok = true
+	token.value = sb.String()
+	token.typ = TokenTypeString
+	return
+}
+
 func (l *Lexer) lexNumber() (token Token, ok bool) {
 	l.sr.UnreadRune()
 	var sb strings.Builder
@@ -78,13 +105,9 @@ func (l *Lexer) lexIdent() (token Token, ok bool) {
 	}
 	sb.WriteRune(r)
 
-	isIdentRune := func(r rune) bool {
-		return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_'
-	}
-
 	for {
 		r, _, err := l.sr.ReadRune()
-		if err != nil || !isIdentRune(r) {
+		if err != nil || !unicode.IsLetter(r) {
 			l.sr.UnreadRune()
 			break
 		}
@@ -138,7 +161,7 @@ func (l *Lexer) Eat() (token Token, ok bool) {
 	case '\'':
 		token.typ = TokenTypeSingleQuote
 	case '"':
-		token.typ = TokenTypeDoubleQuote
+		return l.lexString()
 	case '>':
 		token.typ = TokenTypeGreaterThan
 	case '<':
@@ -175,15 +198,4 @@ func (l *Lexer) Eat() (token Token, ok bool) {
 	token.value = string(r)
 	ok = true
 	return
-}
-
-func main() {
-	l := NewLexer("5 + (7 * num) / 2")
-	for {
-		tok, ok := l.Eat()
-		if !ok {
-			break
-		}
-		fmt.Print(tok.value)
-	}
 }
